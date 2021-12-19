@@ -59,6 +59,21 @@ def apply_gate(qubitE, gate,opqubit):
         tn.connect(qubitE[bit],op[i])
         qubitE[bit]=op[i+len(opqubit)]
 
+def svd_unitary(gate):
+    A=np.zeros((2,2,2,2))
+    for i in range(2):
+        for j in range(2):
+            for k in range(2):
+                for l in range(2):
+                    A[i][j][k][l]=gate[i][k][j][l]
+    A=np.reshape(A,(4,4))
+    U,S,V=np.linalg.svd(A)
+    S=np.diag(S)
+    Lm=np.dot(U,np.sqrt(S))
+    Rm=np.dot(np.sqrt(S),V)
+    
+
+
 def Contract(SGate,TGate,cut,N,D):
     state=np.array([[1.0+0.0j,0.0+0.0j],[0.0+0.0j,1.0+0.0j]])
     depth=cut[0]
@@ -154,6 +169,10 @@ def FContract(SGate,TGate,N,D):
 D=4
 N=13
 cut=(2,5)
-SGate,TGate=getranC(D)
-Contract(SGate,TGate,cut,N,D)
+# SGate,TGate=getranC(D)
+# Contract(SGate,TGate,cut,N,D)
 # FContract(SGate,TGate,N,D)
+
+A=np.array([[1,2,3,4],[1,2,3,4]])
+B=np.reshape(A,(2,2,2))
+print(B)
