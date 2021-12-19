@@ -85,11 +85,8 @@ def Contract(SGate,TGate,cut,N,D):
     num=cut[1]
     crosscut=0
     BigheadNode=[]
-    for d in range(depth,D):
-        for w in Link[d]:
-            if w[0]<num and w[1]>=num:
-                crosscut=1
-    # print(crosscut)
+    XEB=0
+    atstr=[]
     
     with tn.NodeCollection(BigheadNode):
         StateNode=[tn.Node(state[0]) for _ in range(N)]
@@ -162,9 +159,15 @@ def Contract(SGate,TGate,cut,N,D):
             for i in range(len(con)):
                 tn.connect(vec1[i],vec2[i])
             result=vec1@vec2
-            
-            print((strz,result.tensor))
-
+            amp=result.tensor
+            prob=amp.conj()*amp
+            XEB+=prob
+            atstr.append((strz,prob))
+            # print((strz,result.tensor))
+    XEB*=2**(N- num)
+    XEB-=1
+    return XEB,atstr
+    
 
 
 def FContract(SGate,TGate,N,D):
@@ -190,7 +193,12 @@ def FContract(SGate,TGate,N,D):
 D=4
 N=13
 cut=(1,5)
-SGate,TGate=getranC(D)
-Contract(SGate,TGate,cut,N,D)
-FContract(SGate,TGate,N,D)
+
+XEB=-1
+while XEB<=0:
+    SGate,TGate=getranC(D)
+    XEB,atstr=Contract(SGate,TGate,cut,N,D)
+print("XEB={}".format(XEB))
+print(atstr)
+# FContract(SGate,TGate,N,D)
 
