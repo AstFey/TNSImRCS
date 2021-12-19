@@ -60,7 +60,7 @@ def apply_gate(qubitE, gate,opqubit):
         qubitE[bit]=op[i+len(opqubit)]
 
 def svd_unitary(gate):
-    A=np.zeros((2,2,2,2))
+    A=np.zeros((2,2,2,2),dtype=complex)
     for i in range(2):
         for j in range(2):
             for k in range(2):
@@ -72,6 +72,11 @@ def svd_unitary(gate):
     Lm=np.dot(U,np.sqrt(S))
     Rm=np.dot(np.sqrt(S),V)
     
+    Ld=Lm
+    Rd=np.transpose(Rm)
+    Ld=np.reshape(Ld,(2,2,4))
+    Rd=np.reshape(Rd,(2,2,4))
+    return Ld,Rd
 
 
 def Contract(SGate,TGate,cut,N,D):
@@ -84,32 +89,40 @@ def Contract(SGate,TGate,cut,N,D):
         for w in Link[d]:
             if w[0]<num and w[1]>=num:
                 crosscut=1
-    print(crosscut)
-    if crosscut==0:
-        with tn.NodeCollection(BigheadNode):
-            StateNode=[tn.Node(state[0]) for _ in range(N)]
-            qubits=[node[0] for node in StateNode]
-            for d in range(D):
-                if d<depth:
-                    for n in range(N):
-                        apply_gate(qubits,SGate[d][n],[n])
-                    for i,w in enumerate(Link[d]):
+    # print(crosscut)
+    
+    with tn.NodeCollection(BigheadNode):
+        StateNode=[tn.Node(state[0]) for _ in range(N)]
+        qubits=[node[0] for node in StateNode]
+        cutedge=[]
+        for d in range(D):
+            if d<depth:
+                for n in range(N):
+                    apply_gate(qubits,SGate[d][n],[n])
+                for i,w in enumerate(Link[d]):
+                    apply_gate(qubits,TGate[d][i],w)
+            else:
+                for n in range(num,N):
+                    apply_gate(qubits,SGate[d][n],[n])
+                for i,w in enumerate(Link[d]):
+                    if w[0]>=num:
                         apply_gate(qubits,TGate[d][i],w)
-                else:
-                    for n in range(num,N):
-                        apply_gate(qubits,SGate[d][n],[n])
-                    for i,w in enumerate(Link[d]):
-                        if w[0]>=num:
-                            apply_gate(qubits,TGate[d][i],w)
-            for n in range(num,N):
-                apply_gate(qubits,SGate[D][n],[n])
-            EndNode=[tn.Node(state[0]) for _ in range(num,N)]
-            Ebits=[Enode[0] for Enode in EndNode]
-            for n in range(num,N):
-                tn.connect(qubits[n],Ebits[n-num])
-        bigvec=tn.contractors.auto(BigheadNode,output_edge_order=qubits[:num])
+                    elif w[0]<num and w[1]>=num:
+                        _,R=svd_unitary(TGate[d][i])
+                        opR=tn.Node(R)
+                        tn.connect(qubits[w[1]],opR[0])
+                        qubits[w[1]]=opR[1]
+                        cutedge.append(opR[2])
+        for n in range(num,N):
+            apply_gate(qubits,SGate[D][n],[n])
+        EndNode=[tn.Node(state[0]) for _ in range(num,N)]
+        Ebits=[Enode[0] for Enode in EndNode]
+        for n in range(num,N):
+            tn.connect(qubits[n],Ebits[n-num])
+        Eorder=qubits[:num]+cutedge
+        bigvec=tn.contractors.auto(BigheadNode,output_edge_order=Eorder)
         bigvec=bigvec.tensor
-        #print(np.shape(vec1.tensor))
+        #print(np.shape(bigvec))
         for z in range(2**num):
             vec1=tn.Node(bigvec)
             strz=format(z,'b').zfill(num)
@@ -118,6 +131,7 @@ def Contract(SGate,TGate,cut,N,D):
                 StateNode=[]
                 qubits=[]
                 con=[]
+                cutedge=[]
                 for i in range(num):
                     s=int(strz[i])
                     Nnode=tn.Node(state[s])
@@ -130,15 +144,22 @@ def Contract(SGate,TGate,cut,N,D):
                     for i,w in enumerate(Link[d]):
                         if w[1]<num:
                             apply_gate(qubits,TGate[d][i],w)
+                        elif w[0]<num and w[1]>=num:
+                            L,_=svd_unitary(TGate[d][i])
+                            opL=tn.Node(L)
+                            tn.connect(qubits[w[0]],opL[0])
+                            qubits[w[0]]=opL[1]
+                            cutedge.append(opL[2])
                     for n in range(num):
                         apply_gate(qubits,SGate[d+1][n],[n])
                 for n in range(num):
                     tn.connect(qubits[n],StateNode[n][0])
+                con=con+cutedge
             vec2=tn.contractors.auto(SmallheadNode,output_edge_order=con)
             vec2=tn.Node(vec2.tensor)
             # print(np.shape(vec1.tensor))
             # print(np.shape(vec2.tensor))
-            for i in range(num):
+            for i in range(len(con)):
                 tn.connect(vec1[i],vec2[i])
             result=vec1@vec2
             
@@ -168,11 +189,8 @@ def FContract(SGate,TGate,N,D):
 
 D=4
 N=13
-cut=(2,5)
-# SGate,TGate=getranC(D)
-# Contract(SGate,TGate,cut,N,D)
-# FContract(SGate,TGate,N,D)
+cut=(1,5)
+SGate,TGate=getranC(D)
+Contract(SGate,TGate,cut,N,D)
+FContract(SGate,TGate,N,D)
 
-A=np.array([[1,2,3,4],[1,2,3,4]])
-B=np.reshape(A,(2,2,2))
-print(B)
